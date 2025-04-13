@@ -31,7 +31,8 @@ jobs:
       # Run benchmarks using the provided script
       - name: Run benchmarks
         run: |
-          ./bench/tools/run_benchmarks.sh
+          mkdir -p benchmark_history
+          ./run_benchmarks.sh
           # latest.json is now created
 
       # For PRs, compare with main branch
