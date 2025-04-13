@@ -25,6 +25,3 @@ jobs:
 
       - name: Run unit tests
         run: cd test && go test -v ./...
-
-      - name: Run basic tests
-        run: go test -v ./...

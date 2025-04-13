@@ -77,6 +77,59 @@ jobs:
 
           # Results will be in the benchmark-comparison.json file
 
+      # Validate benchmark results for PRs and fail if performance degraded
+      - name: Validate benchmark improvements
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check if benchmarks have improved or remained stable
+          # This script should exit with non-zero status if benchmarks degraded
+          ./bench/tools/validate_benchmarks.sh || (echo "::error::Benchmark performance has degraded! See benchmark results for details." && exit 1)
+
+      # Comment on PR with benchmark results
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            try {
+              const benchmarkResults = fs.readFileSync('./benchmark-comparison.json', 'utf8');
+              const results = JSON.parse(benchmarkResults);
+              
+              // Generate a formatted comment with benchmark comparison
+              let comment = '## Benchmark Results\n\n';
+              comment += '| Benchmark | Before | After | Change |\n';
+              comment += '|-----------|--------|-------|--------|\n';
+              
+              // Add each benchmark to the table
+              for (const benchmark of results.benchmarks) {
+                const beforeValue = benchmark.baseline_ns_per_op.toFixed(2);
+                const afterValue = benchmark.current_ns_per_op.toFixed(2);
+                const pctChange = benchmark.percent_change.toFixed(2);
+                const changeIcon = pctChange <= 0 ? '✅' : '❌';
+                
+                comment += `| ${benchmark.name} | ${beforeValue}ns | ${afterValue}ns | ${changeIcon} ${pctChange}% |\n`;
+              }
+              
+              comment += '\n### Summary\n';
+              comment += results.improved ? 
+                '✅ **Benchmarks have improved or remained stable!**\n' : 
+                '❌ **Some benchmarks have degraded in performance.**\n';
+              
+              // Post comment on PR
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Error processing benchmark results:', error);
+              core.setFailed('Failed to process benchmark results');
+            }
+
       # For main branch pushes and scheduled runs, we just store the benchmark
       - name: Store benchmark results (main branch)
         if: github.event_name != 'pull_request'
@@ -86,7 +139,7 @@ jobs:
           ./bench/tools/store_benchmark.sh
 
       - name: Archive benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-${{ github.sha }}
           path: |
