@@ -28,33 +28,14 @@ jobs:
       - name: Install dependencies
         run: go get -v ./...
 
-      # Run small benchmarks for quick feedback
-      - name: Run small scale benchmarks
+      # Run benchmarks using the provided script
+      - name: Run benchmarks
         run: |
-          go test -v ./bench -run BenchmarkTenThousandKeys > small_benchmark_results.txt
-          cat small_benchmark_results.txt
+          ./bench/tools/run_benchmarks.sh
+          # latest.json is now created
 
-      # Run medium scale benchmarks
-      - name: Run medium scale benchmarks
-        run: |
-          go test -v ./bench -run BenchmarkMillionKeys > medium_benchmark_results.txt
-          cat medium_benchmark_results.txt
-
-      # Run UUID benchmark
-      - name: Run UUID benchmarks
-        run: |
-          go test -v ./bench -run BenchmarkUUIDKeys > uuid_benchmark_results.txt
-          cat uuid_benchmark_results.txt
-
-      # Run large scale benchmarks only on schedule or manual trigger (not on every PR)
-      - name: Run large scale benchmarks
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: |
-          go test -v ./bench -run BenchmarkTenMillionKeys > large_benchmark_results.txt
-          cat large_benchmark_results.txt
-
-      # For PRs, we use the comparison script
-      - name: Run PR benchmark comparison
+      # For PRs, compare with main branch
+      - name: Compare PR benchmarks with main
         if: github.event_name == 'pull_request'
         run: |
           git config --global user.name "GitHub Actions"
@@ -65,24 +46,30 @@ jobs:
 
           echo "PR is comparing branch ${{ github.head_ref }} to main"
 
-          # First, run benchmarks on main branch for baseline
-          echo "Creating baseline from main branch..."
-          git checkout main
-          ./bench/tools/store_benchmark.sh
+          # Save the current PR results
+          cp benchmark_history/latest.json pr_latest.json
 
-          # Switch back to PR branch and compare
-          echo "Switching back to PR branch and comparing..."
-          git checkout ${{ github.sha }}
-          ./bench/tools/compare_pr.sh
+          # Get the baseline from main branch
+          git checkout main -- benchmark_history/latest.json
 
-          # Results will be in the benchmark-comparison.json file
+          if [ ! -f "benchmark_history/latest.json" ]; then
+            echo "No baseline found on main branch. Using current results as baseline."
+            cp pr_latest.json benchmark_history/latest.json
+          else
+            # Rename main branch latest.json to main_latest.json
+            cp benchmark_history/latest.json main_latest.json
+            # Restore PR latest.json
+            cp pr_latest.json benchmark_history/latest.json
+          fi
+
+          # Compare PR results with main
+          ./bench/tools/compare_benchmarks.sh benchmark_history/latest.json main_latest.json
 
       # Validate benchmark results for PRs and fail if performance degraded
       - name: Validate benchmark improvements
         if: github.event_name == 'pull_request'
         run: |
           # Check if benchmarks have improved or remained stable
-          # This script should exit with non-zero status if benchmarks degraded
           ./bench/tools/validate_benchmarks.sh || (echo "::error::Benchmark performance has degraded! See benchmark results for details." && exit 1)
 
       # Comment on PR with benchmark results
@@ -130,14 +117,7 @@ jobs:
               core.setFailed('Failed to process benchmark results');
             }
 
-      # For main branch pushes and scheduled runs, we just store the benchmark
-      - name: Store benchmark results (main branch)
-        if: github.event_name != 'pull_request'
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          ./bench/tools/store_benchmark.sh
-
+      # Archive benchmark results
       - name: Archive benchmark results
         uses: actions/upload-artifact@v4
         with:
