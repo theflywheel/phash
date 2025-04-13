@@ -66,6 +66,37 @@ jobs:
           # Compare PR results with main
           ./bench/tools/compare_benchmarks.sh benchmark_history/latest.json main_latest.json
 
+      # For pushes to main, always update the benchmark baseline
+      - name: Update benchmark baseline
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          # Make sure benchmark_history directory exists
+          mkdir -p benchmark_history
+
+          # Make sure we have a latest.json file (should be created by run_benchmarks.sh)
+          if [ ! -f "benchmark_history/latest.json" ]; then
+            echo "Error: benchmark_history/latest.json not found. Check run_benchmarks.sh"
+            exit 1
+          fi
+
+          # Add and commit the new baseline
+          git add benchmark_history/latest.json
+
+          # Create a timestamped copy for historical tracking
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          cp benchmark_history/latest.json benchmark_history/baseline-${TIMESTAMP}.json
+          git add benchmark_history/baseline-${TIMESTAMP}.json
+
+          git commit -m "Update benchmark baseline [skip ci]"
+
+          # Push using the GitHub token for authentication
+          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${GITHUB_REF#refs/heads/}
+
+          echo "Benchmark baseline updated in the repository."
+
       # Validate benchmark results for PRs and fail if performance degraded
       - name: Validate benchmark improvements
         if: github.event_name == 'pull_request'
