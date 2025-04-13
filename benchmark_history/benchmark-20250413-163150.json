@@ -1,0 +1,79 @@
+{
+  "timestamp": "2025-04-13T16:31:50+05:30",
+  "commit_id": "local",
+  "branch": "dev",
+  "go_version": "go1.23.3",
+  "results": [
+    {
+      "name": "TenMillionKeys",
+      "category": "scale",
+      "operations": 10000000,
+      "ns_per_op": 1492309209,
+      "bytes_per_op": 28521270,
+      "allocs_per_op": 100000,
+      "metrics": {
+        "alloc_mb": 0.979644775390625,
+        "bytes_per_key": 28.52127,
+        "file_size_mb": 272.00002670288086,
+        "insertion_rate": 6739264.267780622,
+        "random_lookup_rate": 11809569.743126506,
+        "random_lookup_time_ns": 8467709,
+        "setup_time_ns": 463250,
+        "sys_mb": 8.141853332519531,
+        "write_time_ns": 1483841500
+      }
+    },
+    {
+      "name": "MillionKeys",
+      "category": "scale",
+      "operations": 1000000,
+      "ns_per_op": 328787875,
+      "bytes_per_op": 356516,
+      "allocs_per_op": 10000,
+      "metrics": {
+        "alloc_mb": 0.27288818359375,
+        "bytes_per_key": 35.651612,
+        "file_size_mb": 34.00002670288086,
+        "insertion_rate": 3047234.415823847,
+        "sys_mb": 8.141853332519531,
+        "verification_rate": 16091192.003321223
+      }
+    },
+    {
+      "name": "TenThousandKeys",
+      "category": "scale",
+      "operations": 10000,
+      "ns_per_op": 29715001,
+      "bytes_per_op": 278556,
+      "allocs_per_op": 20000,
+      "metrics": {
+        "bytes_per_key": 27.8556,
+        "file_size_mb": 0.2656517028808594,
+        "insertion_rate": 345924.0102500052,
+        "random_lookup_rate": 4502800.742061562,
+        "sequential_lookup_rate": 17098869.080798995
+      }
+    },
+    {
+      "name": "UUIDKeys",
+      "category": "scale",
+      "operations": 100000,
+      "ns_per_op": 1530451999,
+      "bytes_per_op": 515000000,
+      "allocs_per_op": 30000000,
+      "metrics": {
+        "alloc_mb": 22.060585021972656,
+        "bytes_per_key": 306.70876,
+        "file_size_mb": 29.25002670288086,
+        "insertion_rate": 66452.87487633179,
+        "retrieval_rate": 7748334.108166744,
+        "retrieve_time_ns": 12906000,
+        "setup_time_ns": 54208,
+        "sys_mb": 50.45435333251953,
+        "validate_time_ns": 12720208,
+        "validation_rate": 7861506.667186574,
+        "write_time_ns": 1504825791
+      }
+    }
+  ]
+}
