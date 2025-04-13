@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"syscall"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 const (
@@ -139,7 +141,8 @@ func (ph *PersistentHash) putWithRetry(key, value []byte, retryCount int) error 
 	}
 
 	hash := hashKey(key)
-	idx := hash % ph.numSlots
+	// idx := hash % ph.numSlots
+	idx := uint32(hash % uint64(ph.numSlots))
 
 	for i := uint32(0); i < ph.numSlots; i++ {
 		currentIdx := (idx + i) % ph.numSlots
@@ -189,7 +192,8 @@ func (ph *PersistentHash) Get(key []byte) ([]byte, bool) {
 	}
 
 	hash := hashKey(key)
-	idx := hash % ph.numSlots
+	// idx := hash % ph.numSlots
+	idx := uint32(hash % uint64(ph.numSlots))
 
 	for i := uint32(0); i < ph.numSlots; i++ {
 		currentIdx := (idx + i) % ph.numSlots
@@ -286,7 +290,8 @@ func (ph *PersistentHash) resize() error {
 			value := ph.data[slotStart+1+ph.keySize : slotStart+ph.slotSize]
 
 			hash := hashKey(key)
-			idx := hash % newNumSlots
+			// idx := hash % newNumSlots
+			idx := uint32(hash % uint64(newNumSlots))
 
 			foundSlot := false
 			for j := uint32(0); j < newNumSlots; j++ {
@@ -363,11 +368,15 @@ const (
 )
 
 // hashKey computes a 32-bit FNV-1a hash of the key
-func hashKey(key []byte) uint32 {
-	hash := uint32(offset32)
-	for _, b := range key {
-		hash ^= uint32(b)
-		hash *= prime32
-	}
-	return hash
+// func hashKey(key []byte) uint32 {
+// 	hash := uint32(offset32)
+// 	for _, b := range key {
+// 		hash ^= uint32(b)
+// 		hash *= prime32
+// 	}
+// 	return hash
+// }
+
+func hashKey(key []byte) uint64 {
+	return xxhash.Sum64(key)
 }
