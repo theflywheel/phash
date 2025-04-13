@@ -51,6 +51,7 @@ if ok {
 - [ ] Add a small redis style I/O layer on top of the hash. SET, GET, DEL, KEYS, etc.
 - [ ] Add a benchmark from Redis
 - [ ] Moar tests
+- [ ] Timestamped persistence (probably through WAL)
 
 ## License
 
