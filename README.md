@@ -52,6 +52,7 @@ if ok {
 - [ ] Add a benchmark from Redis
 - [ ] Moar tests
 - [ ] Timestamped persistence (probably through WAL)
+- [ ] Refactor test cases to make them more generic (Currently LLM Generated)
 
 ## License
 

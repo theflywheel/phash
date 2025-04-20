@@ -9,7 +9,6 @@ import (
 	"github.com/theflywheel/phash"
 )
 
-// TestBasicOperations tests basic put/get operations
 func TestBasicOperations(t *testing.T) {
 	tempFile := "basic_test.phash"
 	defer os.Remove(tempFile)
@@ -17,14 +16,12 @@ func TestBasicOperations(t *testing.T) {
 	keySize := uint32(8)
 	valueSize := uint32(8)
 
-	// Create new hash
 	ph, err := phash.Open(tempFile, keySize, valueSize)
 	if err != nil {
 		t.Fatalf("Failed to open hash: %v", err)
 	}
 	defer ph.Close()
 
-	// Store some values
 	for i := uint64(0); i < 10; i++ {
 		key := make([]byte, keySize)
 		value := make([]byte, valueSize)
@@ -37,7 +34,6 @@ func TestBasicOperations(t *testing.T) {
 		}
 	}
 
-	// Verify values
 	for i := uint64(0); i < 10; i++ {
 		key := make([]byte, keySize)
 		binary.BigEndian.PutUint64(key, i)
@@ -57,7 +53,6 @@ func TestBasicOperations(t *testing.T) {
 	}
 }
 
-// TestPersistence tests that data persists across open/close operations
 func TestPersistence(t *testing.T) {
 	tempFile := "persistence_test.phash"
 	defer os.Remove(tempFile)
@@ -65,14 +60,12 @@ func TestPersistence(t *testing.T) {
 	keySize := uint32(8)
 	valueSize := uint32(8)
 
-	// Create and populate the hash
 	{
 		ph, err := phash.Open(tempFile, keySize, valueSize)
 		if err != nil {
 			t.Fatalf("Failed to open hash: %v", err)
 		}
 
-		// Store some values
 		for i := uint64(0); i < 10; i++ {
 			key := make([]byte, keySize)
 			value := make([]byte, valueSize)
@@ -85,13 +78,11 @@ func TestPersistence(t *testing.T) {
 			}
 		}
 
-		// Close the hash
 		if err := ph.Close(); err != nil {
 			t.Fatalf("Failed to close hash: %v", err)
 		}
 	}
 
-	// Reopen the hash and verify values
 	{
 		ph2, err := phash.Open(tempFile, keySize, valueSize)
 		if err != nil {
@@ -99,7 +90,6 @@ func TestPersistence(t *testing.T) {
 		}
 		defer ph2.Close()
 
-		// Check values
 		for i := uint64(0); i < 10; i++ {
 			key := make([]byte, keySize)
 			binary.BigEndian.PutUint64(key, i)
@@ -120,7 +110,6 @@ func TestPersistence(t *testing.T) {
 	}
 }
 
-// TestInvalidInputs tests error handling for invalid inputs
 func TestInvalidInputs(t *testing.T) {
 	tempFile := "invalid_test.phash"
 	defer os.Remove(tempFile)
@@ -128,7 +117,6 @@ func TestInvalidInputs(t *testing.T) {
 	keySize := uint32(8)
 	valueSize := uint32(8)
 
-	// Create new hash
 	ph, err := phash.Open(tempFile, keySize, valueSize)
 	if err != nil {
 		t.Fatalf("Failed to open hash: %v", err)

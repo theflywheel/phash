@@ -10,13 +10,49 @@ import (
 	"syscall"
 )
 
+// This is a custom implementation designed for SPEED as the primary goal.
+
+// PersistentHash File Format:
+// This is an example of Fixed Length Record (FLR). Read more about it here - https://tech.popdata.org/fixed-length-record-data/
+// +---------------------+
+// | Header (28 bytes)   |
+// +---------------------+
+// | Slot 0              |
+// | Slot 1              |
+// | ...                 |
+// | Slot N              |
+// +---------------------+
+// - Header (28 bytes):
+//   - Magic Number (4 bytes): 0x1A2B3C4D to identify valid phash files
+//   - Version (4 bytes): Format version number
+//   - Number of Slots (4 bytes): Total hash table capacity
+//   - Used Slots (4 bytes): Number of occupied slots (helps track load factor for resizing)
+//   - Key Size (4 bytes): Fixed size of each key in bytes
+//   - Value Size (4 bytes): Fixed size of each value in bytes
+//   - Slot Size (4 bytes): Total size of each slot (1 + keySize + valueSize)
+//
+// - Data Section (variable size):
+//   - Array of slots, each containing:
+//     - Status byte (1 byte): 0=empty, 1=occupied, 2=deleted
+//     - Key (keySize bytes): Fixed-size key data
+//     - Value (valueSize bytes): Fixed-size value data
+//
+// For more information on memory-mapped files and persistent data structures:
+// - "The Art of Computer Programming, Vol. 3" by Donald Knuth (for hash tables)
+// - "Advanced Programming in the UNIX Environment" by Stevens & Rago (for mmap)
+// - "Database Internals" by Alex Petrov (for persistent data structures)
+
 const (
-	magicNumber uint32 = 0x1A2B3C4D
+	magicNumber uint32 = 0x70687368 // ASCII for "phsh" (easter egg)
 	version     uint32 = 1
 	headerSize         = 7 * 4 // 7 uint32 fields
 )
 
-// PersistentHash is a persistent hash table implementation using memory-mapped files
+// persistent hash table implementation using memory-mapped files
+// The mutex is used to synchronize access to the file and data.
+// The file is memory-mapped for direct access, with linear probing used
+// to resolve hash collisions. When load factor exceeds threshold, the
+// table is resized by creating a new file and rehashing all entries.
 type PersistentHash struct {
 	mu        sync.RWMutex
 	file      *os.File
@@ -42,16 +78,30 @@ func Open(filePath string, keySize, valueSize uint32) (*PersistentHash, error) {
 		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
+	// Create a new file when the size is 0
 	if fi.Size() == 0 {
-		initialSlots := uint32(1024)
-		slotSize := 1 + keySize + valueSize
+		// TODO: Make this dynamic based on page size.
+		// via Go’s os.Getpagesize() or POSIX’s sysconf(_SC_PAGESIZE))
+		// Aligning to page boundaries avoids partial pages in your mmap()
+		// region (which can cause wasted space and extra page faults),
+		// ensures mmap length is valid, and often improves I/O throughput by matching the OS’s paging granularity.
+		// Benchmarking is needed to determine the optimal number of slots per page.
+		initialSlots := uint32(1024) // 1k slots.
+
+		slotSize := 1 + keySize + valueSize // defined in spec above
+
 		fileSize := int64(headerSize + initialSlots*slotSize)
+
+		// Truncation ensures that
+		// (1) our subsequent mmap() call can map the full region without error,
+		// (2) writes via the mapped memory won’t run past the end of the file (avoiding SIGBUS),
+		// and (3) the OS allocates contiguous blocks up front for predictable performance.
 		if err := file.Truncate(fileSize); err != nil {
 			file.Close()
 			return nil, fmt.Errorf("failed to truncate file: %w", err)
 		}
 
-		header := make([]byte, headerSize)
+		header := make([]byte, headerSize) // A "slice" of bytes
 		binary.BigEndian.PutUint32(header[0:4], magicNumber)
 		binary.BigEndian.PutUint32(header[4:8], version)
 		binary.BigEndian.PutUint32(header[8:12], initialSlots)
@@ -67,25 +117,31 @@ func Open(filePath string, keySize, valueSize uint32) (*PersistentHash, error) {
 	}
 
 	// Fix for macOS: ensure file size is not zero before mmap
-	fi, err = file.Stat()
+	fileInfo, err := file.Stat()
 	if err != nil {
 		file.Close()
 		return nil, fmt.Errorf("failed to re-stat file: %w", err)
 	}
 
-	fileSize := int(fi.Size())
+	fileSize := int(fileInfo.Size())
 	if fileSize == 0 {
 		file.Close()
 		return nil, fmt.Errorf("file size is zero after initialization")
 	}
 
-	// Use PROT_READ for compatibility
+	// Use PROT_READ for compatibility - https://man7.org/linux/man-pages/man2/mmap.2.html
+	// PROT_READ: Pages may be read.
+	// PROT_WRITE: Pages may be written.
+	// MAP_SHARED: Share changes.
+	// data = memory-mapped file, just a list of bytes with a structure. Implementation can be improved a lot.
 	data, err := syscall.Mmap(int(file.Fd()), 0, fileSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		file.Close()
 		return nil, fmt.Errorf("mmap failed: %w", err)
 	}
 
+	// Validate the magic number for when an existing file is opened.
+	// This is to ensure the file is a valid phash file.
 	magic := binary.BigEndian.Uint32(data[0:4])
 	if magic != magicNumber {
 		syscall.Munmap(data)
@@ -97,11 +153,11 @@ func Open(filePath string, keySize, valueSize uint32) (*PersistentHash, error) {
 		file:      file,
 		data:      data,
 		filePath:  filePath,
-		keySize:   binary.BigEndian.Uint32(data[20:24]),
-		valueSize: binary.BigEndian.Uint32(data[24:28]),
-		slotSize:  binary.BigEndian.Uint32(data[16:20]),
 		numSlots:  binary.BigEndian.Uint32(data[8:12]),
 		usedSlots: binary.BigEndian.Uint32(data[12:16]),
+		slotSize:  binary.BigEndian.Uint32(data[16:20]),
+		keySize:   binary.BigEndian.Uint32(data[20:24]),
+		valueSize: binary.BigEndian.Uint32(data[24:28]),
 	}
 
 	return ph, nil
@@ -363,6 +419,9 @@ const (
 )
 
 // hashKey computes a 32-bit FNV-1a hash of the key
+// Read more here - "https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function"
+// HN has a great thread on why this a bad hash function - https://news.ycombinator.com/item?id=10673868
+// You decide. I didn't find xxhash faster.
 func hashKey(key []byte) uint32 {
 	hash := uint32(offset32)
 	for _, b := range key {

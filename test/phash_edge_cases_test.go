@@ -8,7 +8,6 @@ import (
 	"github.com/theflywheel/phash"
 )
 
-// TestVariousSizes tests different combinations of key and value sizes
 func TestVariousSizes(t *testing.T) {
 	testCases := []struct {
 		name      string
@@ -49,18 +48,15 @@ func TestVariousSizes(t *testing.T) {
 				value[i] = byte((i + 128) % 256)
 			}
 
-			// Store value
 			if err := ph.Put(key, value); err != nil {
 				t.Fatalf("Failed to put value: %v", err)
 			}
 
-			// Retrieve value
 			retrievedValue, found := ph.Get(key)
 			if !found {
 				t.Fatal("Key not found")
 			}
 
-			// Check value
 			if !bytes.Equal(retrievedValue, value) {
 				t.Errorf("Value mismatch for key size %d and value size %d",
 					tc.keySize, tc.valueSize)
@@ -69,7 +65,6 @@ func TestVariousSizes(t *testing.T) {
 	}
 }
 
-// TestResizing tests that the hash table correctly resizes as it grows
 func TestResizing(t *testing.T) {
 	tempFile := "resize_test.phash"
 	defer os.Remove(tempFile)
@@ -85,13 +80,12 @@ func TestResizing(t *testing.T) {
 	defer ph.Close()
 
 	// Insert enough entries to trigger multiple resizes
-	numEntries := 5000 // Should trigger at least a couple of resizes
+	numEntries := 5000
 
 	for i := 0; i < numEntries; i++ {
 		key := make([]byte, keySize)
 		value := make([]byte, valueSize)
 
-		// Fill key and value
 		for j := range key {
 			key[j] = byte((i + j) % 256)
 		}
@@ -103,7 +97,6 @@ func TestResizing(t *testing.T) {
 			t.Fatalf("Failed to put entry %d: %v", i, err)
 		}
 
-		// Verify the entry was stored correctly
 		retrievedValue, found := ph.Get(key)
 		if !found {
 			t.Fatalf("Entry %d not found immediately after insertion", i)
@@ -114,8 +107,8 @@ func TestResizing(t *testing.T) {
 		}
 	}
 
-	// Final verification of a sample of entries
-	for i := 0; i < numEntries; i += (numEntries / 100) { // Check ~100 entries
+	// Check ~100 entries
+	for i := 0; i < numEntries; i += (numEntries / 100) {
 		key := make([]byte, keySize)
 		expectedValue := make([]byte, valueSize)
 
@@ -146,14 +139,12 @@ func TestEmptyValue(t *testing.T) {
 	keySize := uint32(8)
 	valueSize := uint32(0) // Zero-length values
 
-	// Create hash
 	ph, err := phash.Open(tempFile, keySize, valueSize)
 	if err != nil {
 		t.Fatalf("Failed to open hash with zero-length values: %v", err)
 	}
 	defer ph.Close()
 
-	// Create and store a key with an empty value
 	key := make([]byte, keySize)
 	for i := range key {
 		key[i] = byte(i)
@@ -161,18 +152,15 @@ func TestEmptyValue(t *testing.T) {
 
 	emptyValue := make([]byte, 0)
 
-	// Store the empty value
 	if err := ph.Put(key, emptyValue); err != nil {
 		t.Fatalf("Failed to store empty value: %v", err)
 	}
 
-	// Retrieve the value
 	retrievedValue, found := ph.Get(key)
 	if !found {
 		t.Fatal("Key with empty value not found")
 	}
 
-	// Check that the retrieved value is indeed empty
 	if len(retrievedValue) != 0 {
 		t.Errorf("Expected empty value, got value of length %d", len(retrievedValue))
 	}
